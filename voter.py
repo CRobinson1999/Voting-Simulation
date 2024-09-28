@@ -9,6 +9,9 @@ class Voter(object):
     def __init__(self, p):
         self._p = p
 
+    def __getitem__(self, key):
+        return self._p[key]
+
     def dist_to(self, other : Self) -> float:
         return dist(self._p, other._p) if other is not None else nan
 
