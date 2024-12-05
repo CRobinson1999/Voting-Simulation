@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import math
+from voter import *
 
 ##User Inputs##
 #Number of candidates
@@ -9,91 +9,71 @@ candN = 10 #int(input("Number of candidates = "))
 voterN = 5000 #int(input("Number of voters = "))
 
 ##Random Candidate Distribution##
-canddist = np.random.normal(5,1.5,size=(2,candN))
+candidates = [Voter(c) for c in np.random.normal(5,1.5,(candN, 2))]
+
 ##Random Voter Distribution##
-voterdist = np.random.normal(5,1.5,size=(2,voterN))
-voter_proximity = [[0 for i in range(candN)] for j in range(voterN)]
-ffpvote = [0 for i in range(voterN)]
+voters = [Voter(c) for c in np.random.normal(5,1.5,(voterN, 2))]
 
 ##First Past The Post##
-for i in range(voterN):
-    for j in range(candN):
-        voter_proximity[i][j] = math.dist(voterdist[:,i],canddist[:,j])
-    ffpvote[i] = np.argmin(voter_proximity[i])
-
-ffp = [0]*candN
-
-for x in range(candN):
-    ffp[x] = len([i for i in ffpvote if i==x])
-
+ffp_vote = [v.pick_nearest(candidates) for v in voters] # How each voter voted
+ffp_counts = [ffp_vote.count(i) for i in range(len(candidates))] # Votes per candidate
 
 ##Instant Runoff##
-canddistir = canddist
-candir = [list(range(candN))] * candN
-candNir = candN
-irvotes = []
-for h in range(candN-1):
-    voter_proximity = [[0 for i in range(candNir)] for j in range(voterN)]
-    for i in range(voterN):
-        for j in range(candNir):
-            voter_proximity[i][j] = math.dist(voterdist[:,i],canddistir[:,j])
-        ffpvote[i] = np.argmin(voter_proximity[i])
-    irsub = [0 for i in range(candNir)]
-    for x in range(candNir):
-        irsub[x] = len([i for i in ffpvote if i==x])
-    irvotes.append(irsub)
-    irindex = np.argmin(irvotes[h])
-    canddistir = np.delete(canddistir,irindex,1)
-    candNir = candNir-1
-    candir[h+1]= np.delete(candir[h],irindex,0)
+ir_pool = candidates.copy()
+ir_vote = list() # How each voter voted, per round
+ir_counts = list() # Votes per candidate, per round
+while len(ir_pool) > 1 + ir_pool.count(None):
+    ir_vote += [[v.pick_nearest(ir_pool) for v in voters]]
+    ir_counts += [[ir_vote[-1].count(i) if ir_pool[i] else np.nan for i in range(len(ir_pool))]]
+    ir_pool[np.nanargmin(ir_counts[-1])] = None
 
 ##Weighted Average##
-voter_proximity = [[0 for i in range(candN)] for j in range(voterN)]
-for i in range(voterN):
-    for j in range(candN):
-        voter_proximity[i][j] =  math.dist(voterdist[:,i],canddist[:,j])
+# X to 1, where there are X candidates - X votes for the most favored (least distance).
+distances = [[v.dist_to(c) for c in candidates] for v in voters] # Preference space distance
+weighted_vote = [[candN-x for x in np.argsort(np.argsort(vd))] for vd in distances]
 
-for i in range(voterN):
-    for j in range(candN):
-        voter_proximity[i][np.argmin(voter_proximity[i])] = 100 * (j + 1)
-
-weighted = [sum(col) for col in zip(*voter_proximity)]
+# Normalize so each voter gets a total of 1 vote, split between candidates
+weighted_vote_normed = [[v/sum(votelist) for v in votelist] for votelist in weighted_vote]
+weighted_counts = [sum(l) for l in zip(*weighted_vote_normed)] # Sum of (fractional) votes per candidate
 
 ##Plotting##
 #Baseline Votes
 fig = plt.figure(figsize = (10,5))
-plt.bar(list(range(candN)),ffp,width = 0.7)
+plt.bar(list(range(candN)), ffp_counts, width=0.7)
 plt.xlabel("Candidate")
 plt.ylabel("Number of Votes")
 plt.title("Voting Distribution")
-plt.show
+plt.show()
 
 #Instant Runoff Results
 fig = plt.figure(figsize = (10,5))
-irlegend=[]
-for x in range(len(irvotes)):
-    plt.bar(candir[-(x+2)],irvotes[-(x+1)],width=0.7)
-    irlegend.append("Round "+str(len(candir)-x-1))
-plt.legend(irlegend)
+bx = np.arange(len(candidates))
+by = np.zeros(len(candidates))
+for irc in ir_counts:
+    plt.bar(bx, irc, bottom=by, width=0.7)
+    by += [y if not np.isnan(y) else 0 for y in irc] # np.nan propogates in addition
+plt.legend([f"Round {i}" for i in range(len(candidates))])
 plt.xlabel("Candidate")
 plt.ylabel("Number of Votes")
 plt.title("Instant Runoff Voting Distribution")
-plt.show
+plt.show()
 
 #Weight Average Results
 fig = plt.figure(figsize = (10,5))
-plt.bar(list(range(candN)),weighted)
-plt.bar(np.argmin(weighted),weighted[np.argmin(weighted)])
+plt.bar(list(range(candN)), weighted_counts)
+# plt.bar(np.argmin(weighted_counts), weighted_counts[np.argmin(weighted_counts)]) ?
 plt.xlabel("Candidate")
 plt.ylabel("Proximity Score")
 plt.title("Weighted Average Results")
-plt.show
+plt.show()
 
 fig = plt.figure(figsize = (20,20))
-for x in range(candN):
-    plt.text(canddist[0,x],canddist[1,x],str(x), color="red", fontsize=30)
-plt.scatter(voterdist[0],voterdist[1])
+for idx, candidate in enumerate(candidates):
+    plt.text(*candidate._p, str(idx), color="red", fontsize=30)
+plt.scatter(*zip(*voters), c=ffp_vote)
+plt.scatter(*zip(*candidates), c='red')
 plt.xlim(0,10)
 plt.ylim(0,10)
 plt.grid()
-plt.show
+plt.show()
+
