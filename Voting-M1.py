@@ -28,8 +28,10 @@ while len(ir_pool) > 1 + ir_pool.count(None):
     ir_pool[np.nanargmin(ir_counts[-1])] = None
 
 ##Weighted Average##
-tfer_func = lambda x: 1/x
-weighted_vote = [[tfer_func(v.dist_to(c)) for c in candidates] for v in voters] # How each voter voted
+# X to 1, where there are X candidates - X votes for the most favored (least distance).
+distances = [[v.dist_to(c) for c in candidates] for v in voters] # Preference space distance
+weighted_vote = [[candN-x for x in np.argsort(np.argsort(vd))] for vd in distances]
+
 # Normalize so each voter gets a total of 1 vote, split between candidates
 weighted_vote_normed = [[v/sum(votelist) for v in votelist] for votelist in weighted_vote]
 weighted_counts = [sum(l) for l in zip(*weighted_vote_normed)] # Sum of (fractional) votes per candidate
@@ -74,3 +76,4 @@ plt.xlim(0,10)
 plt.ylim(0,10)
 plt.grid()
 plt.show()
+
