@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+    <head></head>
+    <body>
+        <script>
+async function load_wasm() {
+    let obj = {};
+    const response = await fetch("voting-simulation.wasm");
+    const buffer = await response.arrayBuffer();
+    WebAssembly.instantiate(buffer, obj);
+    return obj;
+}
+        </script>
+    </body>
+</html>
